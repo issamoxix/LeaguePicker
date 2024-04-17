@@ -18,6 +18,7 @@ class LeagueClient:
     timeout: int = 8
     trials: int = 1  # in seconds "1s"
     state: str = "Offline"
+    remote_token: str
 
     def __init__(self):
         self.league_dir, self.port = self._get_cmd_args()
@@ -61,6 +62,9 @@ class LeagueClient:
                         port = int(segment.split("=")[1])
                     if "--install-directory" in segment:
                         install_directory = segment.split("=")[1]
+                    if "--remoting-auth-token" in segment:
+                        self.remote_token = segment.split("=")[1]
+                        
                 break
         else:
             raise Exception("The League client must be running!")
@@ -118,7 +122,7 @@ class LeagueClient:
         match response_type:
             case "json":
                 return response.json()
-            case "text":
+            case "json":
                 return response.text
             case _:
                 return response
