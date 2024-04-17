@@ -2,6 +2,8 @@ import wmi
 import os
 import base64
 import requests
+from time import sleep
+from .utils import with_try_except
 
 
 class LeagueClient:
@@ -14,19 +16,21 @@ class LeagueClient:
     password: str
     cache_file: str = "cache.txt"
     timeout: int = 8
+    trials: int = 1  # in seconds "1s"
+    state: str = "Offline"
 
     def __init__(self):
         self.league_dir, self.port = self._get_cmd_args()
         self.passowrd = self._get_password()
+
         self.league_auth = self._handle_password()
         self.headers = {
             "Authorization": f"Basic {self.league_auth}",
             "Accept": "application/json",
         }
+        self.linked = self.ClientIsOpen()
 
     def __enter__(self):
-        if self.league_auth and self.league_dir:
-            self.linked = True
         return self
 
     def _check_cache(self):
@@ -67,6 +71,17 @@ class LeagueClient:
         if not self.league_dir:
             raise Exception("The League client must be running !")
         lockfile_path = os.path.join(self.league_dir, "lockfile")
+
+        count = 0
+        while not os.path.exists(lockfile_path):
+            print("Waiting for Client to Open")
+            sleep(self.trials)
+            count += 1
+            if count > 1500:
+                if os.path.exists(self.cache_file):
+                    os.remove(self.cache_file)
+                break
+
         if not os.path.exists(lockfile_path):
             raise Exception("The League client must be running !")
 
@@ -90,16 +105,47 @@ class LeagueClient:
         summoner_path = "/lol-summoner/v1/current-summoner"  # have all the endpoints in a Dict "constants.py"
         return self.get(summoner_path)
 
-    def get(self, path):
+    @with_try_except
+    def get(self, path, response_type: str = "json"):
+
         response = requests.get(
             f"{self.lcu_url}:{self.port}{path}",
             timeout=self.timeout,
             headers=self.headers,
             verify=False,
         )
-        response.raise_for_status()
 
-        return response.json()
+        match response_type:
+            case "json":
+                return response.json()
+            case "text":
+                return response.text
+            case _:
+                return response
+
+    def ClientIsOpen(self):
+        seconds = 0
+        while True:
+            connection_response = self.get("/lol-login/v1/session", response_type="raw")
+            
+            if isinstance(connection_response, requests.exceptions.ConnectionError):
+                continue
+
+            if connection_response.status_code != 200:
+                continue
+
+            connection_json = connection_response.json()
+
+            self.state = connection_json.get("state", "Offline")
+
+            if self.state == "SUCCEEDED":
+                return True
+
+            sleep(1)
+            seconds += 1
+
+            if seconds > 200:
+                return False
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.linked = False

@@ -8,3 +8,6 @@ from LeagueClient import LeagueClient
 
 with LeagueClient() as lcu:
     summoner = lcu.summoner
+    login_succ = lcu.get("/lol-gameflow/v1/gameflow-phase", "raw")
+    print(login_succ.url)
+    print(lcu.league_auth)
