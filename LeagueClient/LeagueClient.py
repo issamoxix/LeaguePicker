@@ -5,10 +5,11 @@ import requests
 from time import sleep
 from typing import Union
 import threading
+import pythoncom
+from functools import lru_cache
 
 from .utils.log import with_try_except, logger
 from .constants import PROCESS_NAME
-import pythoncom
 
 class LeagueClient:
     league_dir: str = None
@@ -49,7 +50,8 @@ class LeagueClient:
 
     def __enter__(self):
         return self
-
+    
+    @lru_cache
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
         pythoncom.CoInitialize()  # Initialize pythoncom

@@ -1,2 +1,4 @@
 WMI==1.5.1
 requests==2.31.0
+autobahn==23.6.2
+websockets==12.0
