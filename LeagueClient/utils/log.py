@@ -12,5 +12,5 @@ def with_try_except(func):
     return wrapper
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.info("Logger initialized")

@@ -6,8 +6,9 @@ from time import sleep
 from typing import Union
 import threading
 
-from .utils.log import with_try_except
+from .utils.log import with_try_except, logger
 from .constants import PROCESS_NAME
+import pythoncom
 
 class LeagueClient:
     league_dir: str = None
@@ -21,17 +22,19 @@ class LeagueClient:
     timeout: int = 8
     trials: int = 1  # in seconds "1s"
     state: str = "Offline"
-    remote_token: str
+    _remote_token: str = None
     options: list[str] = [
         "--app-port",
         "--install-directory",
         "--remoting-auth-token",
     ]
 
-    def __init__(self, league_dir: Union[None, str]= None):
+    def __init__(self, league_dir: Union[None, str]= None, log_level: str = "INFO"):
+        logger.setLevel(log_level)
+        logger.debug("Initializing LeagueClient")
         if league_dir:
             self.league_dir = league_dir
-            self._get_cmd_args_thread()
+            self.cmd_args_thread = self._get_cmd_args_thread()
         else:
             self.league_dir, self.port = self._get_cmd_args()
 
@@ -48,6 +51,9 @@ class LeagueClient:
         return self
 
     def _get_cmd_args(self):
+        logger.debug("Getting command line arguments")
+        pythoncom.CoInitialize()  # Initialize pythoncom
+
         c = wmi.WMI()
         for process in c.Win32_Process():
             if process.name == PROCESS_NAME:
@@ -58,7 +64,7 @@ class LeagueClient:
                     if "--install-directory" in segment:
                         self.league_dir = segment.split("=")[1]
                     if "--remoting-auth-token" in segment:
-                        self.remote_token = segment.split("=")[1]
+                        self._remote_token = segment.split("=")[1]
                 break
         else:
             raise Exception("The League client must be running!")
@@ -70,6 +76,7 @@ class LeagueClient:
         return thread
 
     def _read_lockfile(self):
+        logger.debug("Reading lockfile")
         if not self.league_dir:
             raise Exception("The League client must be running !")
         lockfile_path = os.path.join(self.league_dir, "lockfile")
@@ -83,7 +90,7 @@ class LeagueClient:
         return content.split(":")
 
     def _get_password(self):
-        print("getting password")
+        logger.debug("Getting password from lockfile")
         process, PID, port, password, protocol = self._read_lockfile()
         self.protocol = protocol
         self.password = password
@@ -91,16 +98,24 @@ class LeagueClient:
         return password
 
     def _handle_password(self):
+        logger.debug("Handling password")
         return base64.b64encode(f"riot:{self.password}".encode()).decode()
 
     @property
     def summoner(self):
-        summoner_path = "/lol-summoner/v1/current-summoner"  # have all the endpoints in a Dict "constants.py"
-        return self.get(summoner_path)
+        # have all the endpoints in a Dict "constants.py"
+        return self.get("/lol-summoner/v1/current-summoner")
+    
+    @property
+    def remote_token(self):
+        if self.cmd_args_thread.is_alive():
+            self.cmd_args_thread.join()
+        return self._remote_token
+    
 
     @with_try_except
     def get(self, path, response_type: str = "json"):
-
+        logger.debug(f"GET request to {path}")
         response = requests.get(
             f"{self.lcu_url}:{self.port}{path}",
             timeout=self.timeout,
@@ -117,6 +132,7 @@ class LeagueClient:
                 return response
 
     def ClientIsOpen(self):
+        logger.debug("Checking if the client is open")
         seconds = 0
         while True:
             connection_response = self.get("/lol-login/v1/session", response_type="raw")
@@ -142,4 +158,4 @@ class LeagueClient:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.linked = False
-        print("Program is Closed")
+        logger.info("Program is Closed")
