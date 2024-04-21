@@ -54,7 +54,6 @@ class LeagueClient(Options):
         self.linked = self.ClientIsOpen()
         self.live = live
 
-
     def __enter__(self):
         if self.live:
             self.ws_thread = threading.Thread(target=self._connect_to_websocket)
@@ -63,10 +62,9 @@ class LeagueClient(Options):
 
     def _connect_to_websocket(self):
         self.LcuWebsocket = LcuWebsocket(
-                port=self.port, remote_token=self.remote_token, headers=self.headers
-            )
+            port=self.port, remote_token=self.remote_token, headers=self.headers
+        )
         self.LcuWebsocket.ws_connect(self.set_state)
-        
 
     @lru_cache
     def _get_cmd_args(self):
@@ -128,6 +126,7 @@ class LeagueClient(Options):
     def set_state(self, value: str) -> str:
         if self.state == value:
             return self.state
+        logger.info("Status: " + value)
         self.state = value
         if "ReadyCheck" == value and self.auto_accept:
             sleep(self.auto_accept_timeout)
