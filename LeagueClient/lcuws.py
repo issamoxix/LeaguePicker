@@ -1,7 +1,11 @@
 from typing import Union
 from websockets.sync.client import connect
+from websockets import exceptions
+
 import ssl
 from .constants import WEBSOCKET_MESSAGE
+import json
+from .utils.log import logger
 
 
 class LcuWebsocket:
@@ -18,9 +22,11 @@ class LcuWebsocket:
         self.headers = headers
         self.url = f"wss://{self.username}:{self.remote_token}@{self.host}:{self.port}"
 
+
+    def ws_connect(self, set_state):
+      
         ssl_context = ssl.SSLContext()
         ssl_context.verify_mode = ssl.CERT_NONE
-
         with connect(
             self.url,
             additional_headers=self.headers,
@@ -31,7 +37,31 @@ class LcuWebsocket:
             while True:
                 try:
                     message = websocket.recv()
-                    print(f"Received: {message.split('"gameStatus":')[1].split(',')[0]}")
+                    s = self.check_status(message)
+                    if s:
+                        logger.debug(f"Received: {s}")
+                        set_state(s)
+
                 except Exception as e:
-                    pass
-                    print("Error: ", e)
+                    logger.error("Error; ",e)
+                    if isinstance(e, exceptions.ConnectionClosed):
+                        raise e
+
+    def check_status(self, message):
+        if "/lol-gameflow/v1/gameflow-phase" in message:
+            message = json.loads(message)
+            message = message[2]
+            if "ReadyCheck" == message.get("data"):
+                return "ReadyCheck"
+            elif "Matchmaking" == message.get("data"):
+                return "Matchmaking"
+            else:
+                return message.get("data")
+            
+        elif "/lol-chat/v1/" in message:
+            message = json.loads(message)
+            message = message[2]
+            if message.get("data", None):
+                if message.get("data").get("lol", None):
+                    return message.get("data").get("lol").get("gameStatus", None) 
+        return False

@@ -8,10 +8,14 @@ import threading
 import pythoncom
 from functools import lru_cache
 
+from .options import Options
+from .lcuws import LcuWebsocket
 from .utils.log import with_try_except, logger
+from .utils.functions import handle_request
 from .constants import PROCESS_NAME
 
-class LeagueClient:
+
+class LeagueClient(Options):
     league_dir: str = None
     league_auth: str = None
     lcu_url: str = "https://127.0.0.1"
@@ -20,17 +24,17 @@ class LeagueClient:
     protocol: str = "https"
     password: str
     cache_file: str = "cache.txt"
-    timeout: int = 8
     trials: int = 1  # in seconds "1s"
     state: str = "Offline"
     _remote_token: str = None
-    options: list[str] = [
-        "--app-port",
-        "--install-directory",
-        "--remoting-auth-token",
-    ]
+    options: dict = {"auto_accept": False}
 
-    def __init__(self, league_dir: Union[None, str]= None, log_level: str = "INFO"):
+    def __init__(
+        self,
+        league_dir: Union[None, str] = None,
+        log_level: str = "INFO",
+        live: bool = True,
+    ):
         logger.setLevel(log_level)
         logger.debug("Initializing LeagueClient")
         if league_dir:
@@ -42,15 +46,28 @@ class LeagueClient:
         self.passowrd = self._get_password()
 
         self.league_auth = self._handle_password()
+        self.full_url = f"{self.lcu_url}:{self.port}"
         self.headers = {
             "Authorization": f"Basic {self.league_auth}",
             "Accept": "application/json",
         }
         self.linked = self.ClientIsOpen()
+        self.live = live
+
 
     def __enter__(self):
+        if self.live:
+            self.ws_thread = threading.Thread(target=self._connect_to_websocket)
+            self.ws_thread.start()
         return self
-    
+
+    def _connect_to_websocket(self):
+        self.LcuWebsocket = LcuWebsocket(
+                port=self.port, remote_token=self.remote_token, headers=self.headers
+            )
+        self.LcuWebsocket.ws_connect(self.set_state)
+        
+
     @lru_cache
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
@@ -107,31 +124,31 @@ class LeagueClient:
     def summoner(self):
         # have all the endpoints in a Dict "constants.py"
         return self.get("/lol-summoner/v1/current-summoner")
-    
+
+    def set_state(self, value: str) -> str:
+        if self.state == value:
+            return self.state
+        self.state = value
+        if "ReadyCheck" == value and self.auto_accept:
+            sleep(self.auto_accept_timeout)
+            self.post("/lol-matchmaking/v1/ready-check/accept", response_type="text")
+        return self.state
+
     @property
     def remote_token(self):
         if self.cmd_args_thread.is_alive():
             self.cmd_args_thread.join()
         return self._remote_token
-    
+
+    @with_try_except
+    def post(self, path, response_type: str = "json"):
+        logger.debug(f"POST request to {path}")
+        return handle_request("POST", self.full_url, path, self.headers, response_type)
 
     @with_try_except
     def get(self, path, response_type: str = "json"):
         logger.debug(f"GET request to {path}")
-        response = requests.get(
-            f"{self.lcu_url}:{self.port}{path}",
-            timeout=self.timeout,
-            headers=self.headers,
-            verify=False,
-        )
-
-        match response_type:
-            case "json":
-                return response.json()
-            case "json":
-                return response.text
-            case _:
-                return response
+        return handle_request("GET", self.full_url, path, self.headers, response_type)
 
     def ClientIsOpen(self):
         logger.debug("Checking if the client is open")
@@ -146,7 +163,6 @@ class LeagueClient:
                 continue
 
             connection_json = connection_response.json()
-
             self.state = connection_json.get("state", "Offline")
 
             if self.state == "SUCCEEDED":
@@ -160,4 +176,6 @@ class LeagueClient:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.linked = False
+        if self.live and self.ws_thread.is_alive():
+            self.ws_thread.join()
         logger.info("Program is Closed")
