@@ -3,7 +3,7 @@ import os
 import base64
 import requests
 from time import sleep
-from typing import Union
+from typing import Union, Optional
 import threading
 import pythoncom
 from functools import lru_cache
@@ -17,22 +17,21 @@ from .constants import PROCESS_NAME
 
 
 class LeagueClient(Options):
-    league_dir: str = None
-    league_auth: str = None
+    league_dir: str
+    league_auth: str
     lcu_url: str = "https://127.0.0.1"
-    port: int = None
+    port: int
     linked: bool = False
     protocol: str = "https"
     password: str
-    cache_file: str = "cache.txt"
     trials: int = 1  # in seconds "1s"
     state: str = "Offline"
-    _remote_token: str = None
+    _remote_token: Optional[str] = None
     options: dict = {"auto_accept": False}
 
     def __init__(
         self,
-        league_dir: Union[None, str] = None,
+        league_dir: Optional[str] = None,
         log_level: str = "INFO",
         live: bool = True,
     ):
@@ -109,7 +108,7 @@ class LeagueClient(Options):
 
     def _get_password(self):
         logger.debug("Getting password from lockfile")
-        process, PID, port, password, protocol = self._read_lockfile()
+        _, _, port, password, protocol = self._read_lockfile()
         self.protocol = protocol
         self.password = password
         self.port = port
@@ -142,12 +141,12 @@ class LeagueClient(Options):
             action = 1
             data = {"championId": self.champions_pool[0]}
             self.patch(
-                f"/lol-champ-select/v1/session/actions/1",
+                f"/lol-champ-select/v1/session/actions/{action}",
                 payload=json.dumps(data),
             )
             sleep(self.auto_hover_champ_timeout)
             self.post(
-                f"/lol-champ-select/v1/session/actions/1/complete",
+                f"/lol-champ-select/v1/session/actions/{action}/complete",
                 payload=json.dumps(data),
             )
 
