@@ -2,11 +2,13 @@ from LeagueClient import LeagueClient
 
 # TODO Support MAC
 # ref https://hextechdocs.dev/getting-started-with-the-lcu-api/
-# TODO Lock Champion
+# TODO add logic for the ChampSelect actions
 
-league_path = r"C:\Riot Games\League of Legends"
-with LeagueClient(league_dir=league_path) as client:
+with LeagueClient() as client:
     client.auto_accept = True
+    client.champions_pool = [
+        98,  # Sheen
+    ]
     summoner = client.summoner
     print(summoner)
     print(client.port, client.remote_token, client.headers, client.headers)
