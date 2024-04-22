@@ -8,7 +8,3 @@ class Options:
     auto_champ_select_timeout: int = 0
     auto_hover_champ_timeout: int = 0
 
-    def __init__(self):
-        return self
-
-
