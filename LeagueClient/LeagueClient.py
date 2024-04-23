@@ -14,13 +14,14 @@ from .lcuws import LcuWebsocket
 from .utils.log import with_try_except, logger
 from .utils.functions import handle_request
 from .constants import PROCESS_NAME
+from .exceptions import LeagueClientClosed
 
 
 class LeagueClient(Options):
-    league_dir: str
-    league_auth: str
+    league_dir: Optional[str]
+    league_auth: Optional[str]
     lcu_url: str = "https://127.0.0.1"
-    port: int
+    port: Optional[int]
     linked: bool = False
     protocol: str = "https"
     password: str
@@ -69,23 +70,27 @@ class LeagueClient(Options):
     @lru_cache
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
-        pythoncom.CoInitialize()  # Initialize pythoncom
+        pythoncom.CoInitialize()  
 
         c = wmi.WMI()
         for process in c.Win32_Process():
             if process.name == PROCESS_NAME:
                 cmd = process.CommandLine
-                for segment in cmd.split('" "'):
-                    if "--app-port" in segment:
-                        self.port = int(segment.split("=")[1])
-                    if "--install-directory" in segment:
-                        self.league_dir = segment.split("=")[1]
-                    if "--remoting-auth-token" in segment:
-                        self._remote_token = segment.split("=")[1]
+                segments = cmd.split('" "')
+                self._parse_segments(segments)
                 break
         else:
-            raise Exception("The League client must be running!")
+            raise LeagueClientClosed
         return True
+    
+    def _parse_segments(self, segments):
+        for segment in segments:
+            if "--app-port" in segment:
+                self.port = int(segment.split("=")[1])
+            if "--install-directory" in segment:
+                self.league_dir = segment.split("=")[1]
+            if "--remoting-auth-token" in segment:
+                self._remote_token = segment.split("=")[1]
 
     def _get_cmd_args_thread(self):
         thread = threading.Thread(target=self._get_cmd_args)
@@ -95,11 +100,11 @@ class LeagueClient(Options):
     def _read_lockfile(self):
         logger.debug("Reading lockfile")
         if not self.league_dir:
-            raise Exception("The League client must be running !")
+            raise LeagueClientClosed
         lockfile_path = os.path.join(self.league_dir, "lockfile")
 
         if not os.path.exists(lockfile_path):
-            raise Exception("The League client must be running !")
+            raise LeagueClientClosed
 
         with open(lockfile_path, "r") as lockfile:
             content = lockfile.read()
