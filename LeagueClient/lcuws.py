@@ -43,7 +43,6 @@ class LcuWebsocket(HandleEvents):
                     logger.error("Error; ", e)
                     if isinstance(e, exceptions.ConnectionClosed):
                         raise e
-
     def check_status(self, message):
         if message:
             message = json.loads(message)

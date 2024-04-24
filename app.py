@@ -4,7 +4,7 @@ from LeagueClient import LeagueClient
 # ref https://hextechdocs.dev/getting-started-with-the-lcu-api/
 # TODO add logic for the ChampSelect actions
 
-with LeagueClient(log_level="DEBUG") as client:
+with LeagueClient() as client:
     # Setting Options
     client.auto_accept = True
     client.auto_pick = True
