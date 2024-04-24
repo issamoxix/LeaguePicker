@@ -6,7 +6,6 @@ from time import sleep
 from typing import Union, Optional
 import threading
 import pythoncom
-from functools import lru_cache
 import json
 
 from .options import Options
@@ -29,6 +28,7 @@ class LeagueClient(Options):
     state: str = "Offline"
     _remote_token: Optional[str] = None
     options: dict = {"auto_accept": False}
+    wait_client: bool = True
 
     def __init__(
         self,
@@ -38,20 +38,23 @@ class LeagueClient(Options):
     ):
         logger.setLevel(log_level)
         logger.debug("Initializing LeagueClient")
-        if league_dir:
-            self.league_dir = league_dir
-            self.cmd_args_thread = self._get_cmd_args_thread()
-        else:
-            self._get_cmd_args()
+
+        self.league_dir = league_dir
+        while not self.is_client_open():
+            logger.info("Waiting for Client")
+            if not self.wait_client:
+                raise LeagueClientClosed
+            sleep(self.client_checker_sleep)
 
         self.passowrd = self._get_password()
-
         self.league_auth = self._handle_password()
+
         self.full_url = f"{self.lcu_url}:{self.port}"
         self.headers = {
             "Authorization": f"Basic {self.league_auth}",
             "Accept": "application/json",
         }
+        
         self.linked = self.ClientIsOpen()
         self.live = live
 
@@ -61,13 +64,21 @@ class LeagueClient(Options):
             self.ws_thread.start()
         return self
 
+    def is_client_open(self):
+        if self.league_dir:
+            lockfile_exists = os.path.exists(os.path.join(self.league_dir, "lockfile"))
+            if lockfile_exists:
+                self.cmd_args_thread = self._get_cmd_args_thread()
+            return lockfile_exists
+        else:
+            return self._get_cmd_args()
+
     def _connect_to_websocket(self):
         self.LcuWebsocket = LcuWebsocket(
             port=self.port, remote_token=self.remote_token, headers=self.headers
         )
         self.LcuWebsocket.ws_connect(self.set_state)
 
-    @lru_cache
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
         pythoncom.CoInitialize()  
@@ -80,7 +91,7 @@ class LeagueClient(Options):
                 self._parse_segments(segments)
                 break
         else:
-            raise LeagueClientClosed
+            return False
         return True
     
     def _parse_segments(self, segments):
