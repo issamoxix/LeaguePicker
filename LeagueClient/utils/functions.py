@@ -1,10 +1,17 @@
 import requests
+from typing import Optional
+from urllib3.exceptions import InsecureRequestWarning
 
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 timeout: int = 8
 
-
 def handle_request(
-    method, full_url: str, path: str, headers, response_type, payload="{}"
+    method,
+    full_url: str,
+    path: str,
+    headers,
+    response_type: Optional[str] = None,
+    payload="{}",
 ):
     """
     Sends a request to the League Client API and returns the response.
@@ -14,7 +21,7 @@ def handle_request(
         full_url (str): The base URL of the League Client API.
         path (str): The path of the specific API endpoint.
         headers: The headers to include in the request.
-        response_type (str): The expected response type ("json" or "text").
+        response_type (str, optional): The expected response type ("json" or "text").
         payload (str, optional): The payload to include in the request. Defaults to "{}".
 
     Returns:

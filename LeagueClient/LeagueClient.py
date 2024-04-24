@@ -3,10 +3,9 @@ import os
 import base64
 import requests
 from time import sleep
-from typing import Union, Optional
+from typing import Optional
 import threading
 import pythoncom
-import json
 
 from .options import Options
 from .lcuws import LcuWebsocket
@@ -16,7 +15,7 @@ from .constants import PROCESS_NAME
 from .exceptions import LeagueClientClosed
 
 
-class LeagueClient(Options):
+class LeagueClient(Options, LcuWebsocket):
     league_dir: Optional[str]
     league_auth: Optional[str]
     lcu_url: str = "https://127.0.0.1"
@@ -27,7 +26,6 @@ class LeagueClient(Options):
     trials: int = 1  # in seconds "1s"
     state: str = "Offline"
     _remote_token: Optional[str] = None
-    options: dict = {"auto_accept": False}
     wait_client: bool = True
 
     def __init__(
@@ -54,13 +52,14 @@ class LeagueClient(Options):
             "Authorization": f"Basic {self.league_auth}",
             "Accept": "application/json",
         }
-        
+
         self.linked = self.ClientIsOpen()
         self.live = live
 
     def __enter__(self):
         if self.live:
-            self.ws_thread = threading.Thread(target=self._connect_to_websocket)
+            LcuWebsocket.__init__(self)
+            self.ws_thread = threading.Thread(target=self.ws_connect)
             self.ws_thread.start()
         return self
 
@@ -73,15 +72,9 @@ class LeagueClient(Options):
         else:
             return self._get_cmd_args()
 
-    def _connect_to_websocket(self):
-        self.LcuWebsocket = LcuWebsocket(
-            port=self.port, remote_token=self.remote_token, headers=self.headers
-        )
-        self.LcuWebsocket.ws_connect(self.set_state)
-
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
-        pythoncom.CoInitialize()  
+        pythoncom.CoInitialize()
 
         c = wmi.WMI()
         for process in c.Win32_Process():
@@ -93,7 +86,7 @@ class LeagueClient(Options):
         else:
             return False
         return True
-    
+
     def _parse_segments(self, segments):
         for segment in segments:
             if "--app-port" in segment:
@@ -136,38 +129,7 @@ class LeagueClient(Options):
 
     @property
     def summoner(self):
-        # have all the endpoints in a Dict "constants.py"
-        return self.get("/lol-summoner/v1/current-summoner")
-
-    def set_state(self, value: str) -> str:
-        if self.state == value:
-            return self.state
-        logger.info("Status: " + value)
-        self.state = value
-        if "ReadyCheck" == value and self.auto_accept:
-            sleep(self.auto_accept_timeout)
-            self.post("/lol-matchmaking/v1/ready-check/accept", response_type="text")
-        if value in ["ChampSelect", "championSelect"]  and len(self.champions_pool) > 0:
-            sleep(self.auto_champ_select_timeout)
-            # get actions from 
-            # GET: /lol-champ-select/v1/session
-            # whenever an action been fulfiled the next action
-            # will be added to the list 
-            # actions += 1 by aciotn: id 
-            action = 1
-            data = {"championId": self.champions_pool[0]}
-            self.patch(
-                f"/lol-champ-select/v1/session/actions/{action}",
-                payload=json.dumps(data),
-            )
-            sleep(self.auto_hover_champ_timeout)
-            self.post(
-                f"/lol-champ-select/v1/session/actions/{action}/complete",
-                payload=json.dumps(data),
-            )
-
-
-        return self.state
+        return self.get("/lol-summoner/v1/current-summoner", response_type="json")
 
     @property
     def remote_token(self):
@@ -178,21 +140,21 @@ class LeagueClient(Options):
         return self._remote_token
 
     @with_try_except
-    def post(self, path, response_type: str = "json", payload: str = "{}"):
+    def post(self, path, response_type: Optional[str] = None, payload: str = "{}"):
         logger.debug(f"POST request to {path}")
         return handle_request(
             "POST", self.full_url, path, self.headers, response_type, payload
         )
-    
+
     @with_try_except
-    def patch(self, path, response_type: str = "json", payload: str = "{}"):
-        logger.debug(f"POST request to {path}")
+    def patch(self, path, response_type: Optional[str] = None, payload: str = "{}"):
+        logger.debug(f"PATCH request to {path}")
         return handle_request(
             "PATCH", self.full_url, path, self.headers, response_type, payload
         )
 
     @with_try_except
-    def get(self, path, response_type: str = "json"):
+    def get(self, path, response_type: Optional[str] = None):
         logger.debug(f"GET request to {path}")
         return handle_request("GET", self.full_url, path, self.headers, response_type)
 
