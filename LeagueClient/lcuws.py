@@ -56,12 +56,8 @@ class LcuWebsocket(HandleEvents):
                     return message.get("data")
                 case _:
                     if "/lol-chat/v1/" in message:
-                        if message.get("data", None):
-                            if message.get("data").get("lol", None):
-                                return (
-                                    message.get("data")
-                                    .get("lol")
-                                    .get("gameStatus", None)
-                                )
+                        if message.get("data", None) and message.get("data", {}).get("lol"):
+                            return message.get("data").get("lol").get("gameStatus", None)
+                    
                     self.handle_message(uri)
         return False
