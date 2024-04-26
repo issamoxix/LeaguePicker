@@ -14,7 +14,7 @@ class HandleEvents:
 
     def handle_message(self, uri):
         if "/lol-champ-select/v1/session" == uri:
-            self._event_ChampSelect()
+            self._event_champ_select()
 
     def set_state(self, value: str):
         if self.state == value:
@@ -24,9 +24,9 @@ class HandleEvents:
 
         match value:
             case "ReadyCheck":
-                self._event_ReadyCheck()
+                self._event_ready_check()
             case "ChampSelect":
-                self._event_ChampSelect()
+                self._event_champ_select()
         return self.state
 
     def _get_action(self) -> dict:
@@ -34,26 +34,30 @@ class HandleEvents:
 
         no_action = {"id": 0, "type": None}
 
-        actions = json_response.get("actions")
+        actions = json_response.get("actions", None)
+
+        if not actions:
+            return no_action
+        
         for action_list in actions:
-            action = action_list[-1]
-            if action.get("completed"):
-                continue
+            for action in action_list:
+                if action.get("completed"):
+                    continue
 
-            if action.get("actorCellId") != json_response.get("localPlayerCellId"):
-                continue
+                if action.get("actorCellId") != json_response.get("localPlayerCellId"):
+                    continue
 
-            return action
+                return action
         return no_action
 
-    def _event_ReadyCheck(self):
+    def _event_ready_check(self):
         logger.debug("[Event][ReadyCheck]")
         if not self.auto_accept:
             return
         sleep(self.auto_accept_timeout)
         self.post("/lol-matchmaking/v1/ready-check/accept")
 
-    def _event_ChampSelect(self):
+    def _event_champ_select(self):
         logger.debug("[Event][ChampSelect]")
         if len(self.champions_pool) <= 0 or not self.auto_pick:
             return
@@ -71,7 +75,8 @@ class HandleEvents:
             data = {"championId": self.champions_pool[0]}
         elif action_type == "ban":
             data = {"championId": self.champions_ban_pool[0]}
-
+        else:
+            return 
         self.patch(
             f"/lol-champ-select/v1/session/actions/{action_id}",
             payload=json.dumps(data),
