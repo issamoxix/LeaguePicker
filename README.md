@@ -13,6 +13,12 @@ Note: This project is still under development.
 </br>
 
 More features will be added in the future.
+#### TODO
+<ul>
+<li>Support MAC</li>
+<li>ChampSelect</li>
+</ul> 
+
 ## Setup
 Please note that this project is still under construction. <br>
 
@@ -29,3 +35,5 @@ If you’d like to get in touch with me, join my Discord [here](https://discord.
 Here you can find all the endpoints [Swagger](https://www.mingweisamuel.com/lcu-schema/tool/#/Plugin%20lol-champ-select)
 </br>
 https://gist.github.com/Asbra/484165c4dd171e58275a1a0fb83e6978
+</br>
+[Blog](https://hextechdocs.dev/getting-started-with-the-lcu-api/)

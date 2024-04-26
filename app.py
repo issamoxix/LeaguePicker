@@ -1,15 +1,12 @@
 from LeagueClient import LeagueClient
 
-# TODO Support MAC
-# ref https://hextechdocs.dev/getting-started-with-the-lcu-api/
-# TODO add logic for the ChampSelect actions
 
 with LeagueClient(log_level="DEBUG") as client:
     # Setting Options
     client.auto_accept = True
     client.auto_pick = True
     client.champions_pool = [
-        222,
+        222, # Jinx
         98,  # Sheen
     ]
     client.champions_ban_pool = [
