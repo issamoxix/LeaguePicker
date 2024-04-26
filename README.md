@@ -23,3 +23,9 @@ Please note that this project is still under construction. <br>
 ## Contribution
 If you'd like to contribute or explore the existing features, feel free to clone the repository and experiment with it. </br> 
 If you’d like to get in touch with me, join my Discord [here](https://discord.gg/kDcm9KZD).
+
+## Resources
+
+Here you can find all the endpoints [Swagger](https://www.mingweisamuel.com/lcu-schema/tool/#/Plugin%20lol-champ-select)
+</br>
+https://gist.github.com/Asbra/484165c4dd171e58275a1a0fb83e6978
