@@ -29,26 +29,27 @@ class HandleEvents:
                 self._event_champ_select()
         return self.state
 
-    def _get_action(self) -> dict:
+    def _get_action(self) -> list[dict, list]:
         json_response = self.get("/lol-champ-select/v1/session", response_type="json")
-
+        unavailable_champs = self._handle_unavailable_champs(json_response)
         no_action = {"id": 0, "type": None}
 
         actions = json_response.get("actions", None)
-
+       
         if not actions:
-            return no_action
+            return no_action, unavailable_champs
         
+        local_cell_id = json_response.get("localPlayerCellId")
         for action_list in actions:
             for action in action_list:
                 if action.get("completed"):
                     continue
 
-                if action.get("actorCellId") != json_response.get("localPlayerCellId"):
+                if action.get("actorCellId") != local_cell_id:
                     continue
 
-                return action
-        return no_action
+                return action, unavailable_champs
+        return no_action, unavailable_champs
 
     def _event_ready_check(self):
         logger.debug("[Event][ReadyCheck]")
@@ -62,9 +63,8 @@ class HandleEvents:
         if len(self.champions_pool) <= 0 or not self.auto_pick:
             return
 
-        sleep(self.auto_champ_select_timeout)
 
-        action = self._get_action()
+        action, unavailable_champs = self._get_action()
         action_id = action.get("id")
         action_type = action.get("type")
 
@@ -72,17 +72,52 @@ class HandleEvents:
             return
 
         if action_type == "pick":
-            data = {"championId": self.champions_pool[0]}
+            champions_list = list(self.champions_pool)
         elif action_type == "ban":
-            data = {"championId": self.champions_ban_pool[0]}
+            champions_list = list(self.champions_ban_pool)
         else:
-            return 
+            return
+        
+        unpickable_champs = []
+        for champion in champions_list:
+            if champion not in unavailable_champs:
+                break
+            unpickable_champs.append(champion)
+        if champions_list == unpickable_champs:
+            return  
+
+            
+            
+        data = {"championId": champion}
+        sleep(self.auto_champ_select_timeout)
+
         self.patch(
             f"/lol-champ-select/v1/session/actions/{action_id}",
             payload=json.dumps(data),
         )
+        
         sleep(self.auto_hover_champ_timeout)
+
         self.post(
             f"/lol-champ-select/v1/session/actions/{action_id}/complete",
             payload=json.dumps(data),
         )
+
+    def _handle_unavailable_champs(self, json_response: dict) -> list:
+        champ_list = []
+        bans = json_response.get("bans", None)
+        my_team = json_response.get("myTeam", [])
+        their_team = json_response.get("theirTeam", [])
+
+        if bans:
+            champ_list += bans.get("myTeamBans",[]) + bans.get("theirTeamBans", [])
+        
+        if len(my_team) > 0:
+            for team in my_team:
+                champ_list.append(team.get("championId", 0))
+        
+        if len(their_team) > 0:
+            for team in their_team:
+                champ_list.append(team.get("championId", 0))
+        
+        return champ_list
