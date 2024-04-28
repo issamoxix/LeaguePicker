@@ -29,7 +29,7 @@ class HandleEvents:
                 self._event_champ_select()
         return self.state
 
-    def _get_action(self) -> list[dict, list]:
+    def _get_action(self):
         json_response = self.get("/lol-champ-select/v1/session", response_type="json")
         unavailable_champs = self._handle_unavailable_champs(json_response)
         no_action = {"id": 0, "type": None}
