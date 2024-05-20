@@ -65,7 +65,8 @@ class LeagueClient(Options, LcuWebsocket):
 
     def is_client_open(self):
         if self.league_dir:
-            lockfile_exists = os.path.exists(os.path.join(self.league_dir, "lockfile"))
+            lockfile_path = os.path.join(self.league_dir, "lockfile")
+            lockfile_exists = os.path.exists(lockfile_path)
             if lockfile_exists:
                 self.cmd_args_thread = self._get_cmd_args_thread()
             return lockfile_exists
@@ -129,7 +130,8 @@ class LeagueClient(Options, LcuWebsocket):
 
     @property
     def summoner(self):
-        return self.get("/lol-summoner/v1/current-summoner", response_type="json")
+        current_summoner = "/lol-summoner/v1/current-summoner"
+        return self.get(current_summoner, r_type="json")
 
     @property
     def remote_token(self):
@@ -140,31 +142,33 @@ class LeagueClient(Options, LcuWebsocket):
         return self._remote_token
 
     @with_try_except
-    def post(self, path, response_type: Optional[str] = None, payload: str = "{}"):
+    def post(self, path, r_type=None, payload: str = "{}"):
         logger.debug(f"POST request to {path}")
         return handle_request(
-            "POST", self.full_url, path, self.headers, response_type, payload
+            "POST", self.full_url, path, self.headers, r_type, payload
         )
 
     @with_try_except
-    def patch(self, path, response_type: Optional[str] = None, payload: str = "{}"):
+    def patch(self, path, r_type: Optional[str] = None, payload: str = "{}"):
         logger.debug(f"PATCH request to {path}")
         return handle_request(
-            "PATCH", self.full_url, path, self.headers, response_type, payload
+            "PATCH", self.full_url, path, self.headers, r_type, payload
         )
 
     @with_try_except
-    def get(self, path, response_type: Optional[str] = None):
+    def get(self, path, r_type: Optional[str] = None):
         logger.debug(f"GET request to {path}")
-        return handle_request("GET", self.full_url, path, self.headers, response_type)
+        return handle_request("GET", self.full_url, path, self.headers, r_type)
 
     def ClientIsOpen(self):
         logger.debug("Checking if the client is open")
         seconds = 0
+        connection_error = requests.exceptions.ConnectionError
+        session_path = "/lol-login/v1/session"
         while True:
-            connection_response = self.get("/lol-login/v1/session", response_type="raw")
+            connection_response = self.get(session_path, r_type="raw")
 
-            if isinstance(connection_response, requests.exceptions.ConnectionError):
+            if isinstance(connection_response, connection_error):
                 continue
 
             if connection_response.status_code != 200:

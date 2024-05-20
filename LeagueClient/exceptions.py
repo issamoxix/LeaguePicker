@@ -14,6 +14,9 @@ class LeagueClientClosed(LeagueClientExcepionts):
     """
     Raised when league client is not open.
     """
-    def __init__(self, message:Optional[str] = "The League client must be running!"):
+
+    message: Optional[str] = "The League client must be running!"
+
+    def __init__(self, message: Optional[str]):
         self.message = message
         super().__init__(self.message)

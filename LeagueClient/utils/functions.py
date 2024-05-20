@@ -5,6 +5,7 @@ from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 timeout: int = 8
 
+
 def handle_request(
     method,
     full_url: str,
@@ -17,18 +18,19 @@ def handle_request(
     Sends a request to the League Client API and returns the response.
 
     Args:
-        method (str): The HTTP method to use for the request (e.g., "GET", "POST").
+        :param method: HTTP method to use for the request (e.g, "GET", "POST").
         full_url (str): The base URL of the League Client API.
         path (str): The path of the specific API endpoint.
         headers: The headers to include in the request.
-        response_type (str, optional): The expected response type ("json" or "text").
-        payload (str, optional): The payload to include in the request. Defaults to "{}".
+        response_type(str, optional): Expected response type ["json","text"].
+        payload (str, optional): Payload for the request. Defaults to "{}".
 
     Returns:
         The response from the League Client API.
 
     Note:
-        The `verify` parameter is set to `False` to bypass SSL verification due to the nature of the League Client API.
+        The `verify` parameter is set to `False` to bypass SSL verification
+        Due to the nature of the League Client API.
 
     """
     response = requests.request(

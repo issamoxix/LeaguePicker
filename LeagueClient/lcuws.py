@@ -18,7 +18,8 @@ class LcuWebsocket(HandleEvents):
     headers: Union[dict, None] = None
 
     def __init__(self) -> None:
-        self.url = f"wss://{self.username}:{self.remote_token}@{self.host}:{self.port}"
+        network_addr = f"{self.host}:{self.port}"
+        self.url = f"wss://{self.username}:{self.remote_token}@{network_addr}"
         super().__init__()
 
     def ws_connect(self):
@@ -43,6 +44,7 @@ class LcuWebsocket(HandleEvents):
                     logger.error("Error; ", e)
                     if isinstance(e, exceptions.ConnectionClosed):
                         raise e
+
     def check_status(self, message):
         if message:
             message = json.loads(message)
@@ -55,8 +57,9 @@ class LcuWebsocket(HandleEvents):
                     return message.get("data")
                 case _:
                     if "/lol-chat/v1/" in message:
-                        if message.get("data", None) and message.get("data", {}).get("lol"):
-                            return message.get("data").get("lol").get("gameStatus", None)
-                    
+                        data = message.get("data", {})
+                        if "lol" in data:
+                            return data.get("lol").get("gameStatus", None)
+
                     self.handle_message(uri)
         return False
