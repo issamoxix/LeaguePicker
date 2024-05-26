@@ -2,9 +2,7 @@ import json
 from time import sleep
 from typing import Optional
 
-
 from .utils.log import logger
-from .routes.lol_matchmaking import Endpoints
 
 
 class HandleEvents:
@@ -12,10 +10,9 @@ class HandleEvents:
 
     def __init__(self):
         logger.debug("Handle Events Initialize")
-        self.routes = Endpoints()
 
     def handle_message(self, uri):
-        if "/lol-champ-select/v1/session" == uri:
+        if self.routes.champ_select.session == uri:
             self._event_champ_select()
 
     def set_state(self, value: str):
@@ -32,7 +29,7 @@ class HandleEvents:
         return self.state
 
     def _get_action(self):
-        json_response = self.get("/lol-champ-select/v1/session", r_type="json")
+        json_response = self.get(self.routes.champ_select.session, r_type="json")
         unavailable_champs = self._handle_unavailable_champs(json_response)
         no_action = {"id": 0, "type": None}
 
@@ -58,9 +55,7 @@ class HandleEvents:
         if not self.auto_accept:
             return
         sleep(self.auto_accept_timeout)
-        # TODO check Remove Below
-        # self.post("/lol-matchmaking/v1/ready-check/accept")
-        self.post(self.routes.ready_check_accept)
+        self.post(self.routes.matchmaking.ready_check_accept)
 
     def _event_champ_select(self):
         logger.debug("[Event][ChampSelect]")
@@ -93,14 +88,14 @@ class HandleEvents:
         sleep(self.auto_champ_select_timeout)
 
         self.patch(
-            self.routes.session_actions_by_id % action_id,
+            self.routes.champ_select.session_actions_by_id % action_id,
             payload=json.dumps(data),
         )
 
         sleep(self.auto_hover_champ_timeout)
 
         self.post(
-            f"/lol-champ-select/v1/session/actions/{action_id}/complete",
+            self.routes.champ_select.session_actions_complete % action_id,
             payload=json.dumps(data),
         )
 

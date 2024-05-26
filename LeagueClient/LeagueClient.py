@@ -13,6 +13,7 @@ from .utils.log import with_try_except, logger
 from .utils.functions import handle_request
 from .constants import PROCESS_NAME
 from .exceptions import LeagueClientClosed
+from .routes.lol_matchmaking import Endpoints
 
 
 class LeagueClient(Options, LcuWebsocket):
@@ -23,8 +24,6 @@ class LeagueClient(Options, LcuWebsocket):
     linked: bool = False
     protocol: str = "https"
     password: str
-    trials: int = 1  # in seconds "1s"
-    state: str = "Offline"
     _remote_token: Optional[str] = None
     wait_client: bool = True
 
@@ -37,6 +36,7 @@ class LeagueClient(Options, LcuWebsocket):
         logger.setLevel(log_level)
         logger.debug("Initializing LeagueClient")
 
+        self.routes = Endpoints()
         self.league_dir = league_dir
         while not self.is_client_open():
             logger.info("Waiting for Client")
@@ -130,7 +130,7 @@ class LeagueClient(Options, LcuWebsocket):
 
     @property
     def summoner(self):
-        current_summoner = "/lol-summoner/v1/current-summoner"
+        current_summoner = self.routes.summoner.current_summoner
         return self.get(current_summoner, r_type="json")
 
     @property
@@ -164,7 +164,7 @@ class LeagueClient(Options, LcuWebsocket):
         logger.debug("Checking if the client is open")
         seconds = 0
         connection_error = requests.exceptions.ConnectionError
-        session_path = "/lol-login/v1/session"
+        session_path = self.routes.login.login_session
         while True:
             connection_response = self.get(session_path, r_type="raw")
 
@@ -175,9 +175,9 @@ class LeagueClient(Options, LcuWebsocket):
                 continue
 
             connection_json = connection_response.json()
-            self.state = connection_json.get("state", "Offline")
+            state = connection_json.get("state", "Offline")
 
-            if self.state == "SUCCEEDED":
+            if state == "SUCCEEDED":
                 return True
 
             sleep(1)
@@ -190,4 +190,4 @@ class LeagueClient(Options, LcuWebsocket):
         self.linked = False
         if self.live and self.ws_thread.is_alive():
             self.ws_thread.join()
-        logger.info("Program is Closed")
+        logger.debug("Program is Closed")

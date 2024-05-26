@@ -3,6 +3,7 @@ from websockets.sync.client import connect
 from websockets import exceptions
 import ssl
 import json
+import threading
 
 from LeagueClient.events import HandleEvents
 from .constants import WEBSOCKET_MESSAGE
@@ -21,6 +22,13 @@ class LcuWebsocket(HandleEvents):
         network_addr = f"{self.host}:{self.port}"
         self.url = f"wss://{self.username}:{self.remote_token}@{network_addr}"
         super().__init__()
+        self.stop_event = threading.Event()
+
+    def _handle_message(self, message):
+        status = self.check_status(message)
+        if status:
+            logger.debug(f"Received: {status}")
+            self.set_state(status)
 
     def ws_connect(self):
         ssl_context = ssl.SSLContext()
@@ -32,18 +40,18 @@ class LcuWebsocket(HandleEvents):
             max_size=2**30,
         ) as websocket:
             websocket.send(WEBSOCKET_MESSAGE)
-            while True:
-                try:
-                    message = websocket.recv()
-                    status = self.check_status(message)
-                    if status:
-                        logger.debug(f"Received: {status}")
-                        self.set_state(status)
-
-                except Exception as e:
-                    logger.error("Error; ", e)
-                    if isinstance(e, exceptions.ConnectionClosed):
+            try:
+                while not self.stop_event.is_set():
+                    try:
+                        message = websocket.recv()
+                        self._handle_message(message)
+                    except exceptions.ConnectionClosed as e:
+                        logger.error("Connection closed: %s", e)
                         raise e
+                    except Exception as e:
+                        logger.error("Error: %s", e)
+            except KeyboardInterrupt:
+                logger.debug("Process interrupted by user")
 
     def check_status(self, message):
         if message:
@@ -51,9 +59,9 @@ class LcuWebsocket(HandleEvents):
             message = message[2]
             uri = message.get("uri")
             match uri:
-                case "/lol-gameflow/v1/session":
+                case self.routes.game_flow.session:
                     return message.get("data").get("phase")
-                case "/lol-gameflow/v1/gameflow-phase":
+                case self.routes.game_flow.phase:
                     return message.get("data")
                 case _:
                     if "/lol-chat/v1/" in message:
