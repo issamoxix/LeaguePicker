@@ -17,15 +17,38 @@ from .routes.lol_matchmaking import Endpoints
 
 
 class LeagueClient(Options, LcuWebsocket):
+    """
+    Main class for interacting with the League of Legends client.
+
+    This class combines the functionalities of the `Options` and `LcuWebsocket` classes,
+      allowing you to set and get various configurations and interact with the client's websocket.
+
+    Attributes
+    ----------
+    league_dir : Optional[str]
+        The path to the League of Legends directory.
+    league_auth : Optional[str]
+        The authentication token for the League of Legends client.
+    lcu_url : str
+        The URL of the League of Legends client.
+    port : Optional[int]
+        The port number of the League of Legends client.
+    protocol : str
+        The protocol used by the League of Legends client.
+    password : str
+        The password for the League of Legends client.
+    _remote_token : Optional[str]
+        The remote token for the League of Legends client.
+
+    """
+
     league_dir: Optional[str]
     league_auth: Optional[str]
     lcu_url: str = "https://127.0.0.1"
     port: Optional[int]
-    linked: bool = False
     protocol: str = "https"
     password: str
     _remote_token: Optional[str] = None
-    wait_client: bool = True
 
     def __init__(
         self,
@@ -38,22 +61,8 @@ class LeagueClient(Options, LcuWebsocket):
 
         self.routes = Endpoints()
         self.league_dir = league_dir
-        while not self.is_client_open():
-            logger.info("Waiting for Client")
-            if not self.wait_client:
-                raise LeagueClientClosed
-            sleep(self.client_checker_sleep)
-
-        self.passowrd = self._get_password()
-        self.league_auth = self._handle_password()
-
-        self.full_url = f"{self.lcu_url}:{self.port}"
-        self.headers = {
-            "Authorization": f"Basic {self.league_auth}",
-            "Accept": "application/json",
-        }
-
-        self.linked = self.ClientIsOpen()
+        self.wait_for_client_process()
+        self.wait_for_client()
         self.live = live
 
     def __enter__(self):
@@ -63,7 +72,7 @@ class LeagueClient(Options, LcuWebsocket):
             self.ws_thread.start()
         return self
 
-    def is_client_open(self):
+    def is_client_open(self) -> bool:
         if self.league_dir:
             lockfile_path = os.path.join(self.league_dir, "lockfile")
             lockfile_exists = os.path.exists(lockfile_path)
@@ -72,6 +81,21 @@ class LeagueClient(Options, LcuWebsocket):
             return lockfile_exists
         else:
             return self._get_cmd_args()
+
+    def wait_for_client_process(self):
+        while not self.is_client_open():
+            logger.info("Waiting for Client")
+            sleep(self.client_checker_sleep)
+        self.websocket_config()
+
+    def websocket_config(self):
+        self.passowrd = self._get_password()
+        self.league_auth = self._handle_password()
+        self.full_url = f"{self.lcu_url}:{self.port}"
+        self.headers = {
+            "Authorization": f"Basic {self.league_auth}",
+            "Accept": "application/json",
+        }
 
     def _get_cmd_args(self):
         logger.debug("Getting command line arguments")
@@ -160,14 +184,13 @@ class LeagueClient(Options, LcuWebsocket):
         logger.debug(f"GET request to {path}")
         return handle_request("GET", self.full_url, path, self.headers, r_type)
 
-    def ClientIsOpen(self):
+    def wait_for_client(self):
         logger.debug("Checking if the client is open")
         seconds = 0
         connection_error = requests.exceptions.ConnectionError
         session_path = self.routes.login.login_session
         while True:
             connection_response = self.get(session_path, r_type="raw")
-
             if isinstance(connection_response, connection_error):
                 continue
 
@@ -176,18 +199,15 @@ class LeagueClient(Options, LcuWebsocket):
 
             connection_json = connection_response.json()
             state = connection_json.get("state", "Offline")
-
             if state == "SUCCEEDED":
                 return True
 
             sleep(1)
             seconds += 1
-
             if seconds > 200:
                 return False
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.linked = False
         if self.live and self.ws_thread.is_alive():
             self.ws_thread.join()
         logger.debug("Program is Closed")
