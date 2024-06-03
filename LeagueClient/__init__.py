@@ -1,1 +1,1 @@
-from .LeagueClient import LeagueClient
+from .LeagueClient import LeagueClient  # noqa: F401
