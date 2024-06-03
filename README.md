@@ -9,6 +9,7 @@ Note: This project is still under development.
 <li>Auto Accept </li>
 <li>Auto Ban </li> 
 <li>Auto Pick </li>
+<li>ChampSelect</li>
 </ul>
 </br>
 
@@ -16,7 +17,7 @@ More features will be added in the future.
 #### TODO
 <ul>
 <li>Support MAC</li>
-<li>ChampSelect</li>
+
 </ul> 
 
 ## Setup
