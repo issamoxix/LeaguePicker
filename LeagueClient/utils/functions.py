@@ -38,7 +38,6 @@ def handle_request(
         full_url + path,
         timeout=timeout,
         headers=headers,
-        verify=False,
         data=payload,
     )
     match response_type:
